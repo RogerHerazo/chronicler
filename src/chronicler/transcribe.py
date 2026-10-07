@@ -9,6 +9,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import soundfile as sf
+
+from chronicler.audio.source import SAMPLE_RATE
+
 log = logging.getLogger(__name__)
 
 # (model, approx download size) in order of preference per hardware tier.
@@ -50,9 +54,15 @@ def cuda_device_count() -> int:
         return 0
 
 
+def gpu_usable() -> bool:
+    from chronicler import cuda
+
+    return cuda_device_count() > 0 and not cuda.missing_libraries()
+
+
 def plan_device(model: str = "auto", device: str = "auto") -> DevicePlan:
     if device == "auto":
-        device = "cuda" if cuda_device_count() > 0 else "cpu"
+        device = "cuda" if gpu_usable() else "cpu"
     compute_type = "float16" if device == "cuda" else "int8"
     if model == "auto":
         model = GPU_DEFAULT_MODEL if device == "cuda" else CPU_DEFAULT_MODEL
@@ -84,6 +94,11 @@ class Transcriber:
                 return
             from faster_whisper import WhisperModel
 
+            if self.plan.device == "cuda":
+                from chronicler import cuda
+
+                cuda.preload()
+
             log.info(
                 "loading whisper %s on %s (%s)",
                 self.plan.model,
@@ -95,11 +110,16 @@ class Transcriber:
             )
 
     def transcribe(self, audio: Path | Any, offset: float = 0.0) -> list[Segment]:
-        """Transcribe a file path or 16 kHz mono float32 array."""
+        """Transcribe a 16 kHz mono WAV written by the recorder, or a float32 array."""
+        if isinstance(audio, Path):
+            # Read it ourselves: faster-whisper's own decoder is pinned to an older PyAV API.
+            audio, rate = sf.read(audio, dtype="float32", always_2d=False)
+            if rate != SAMPLE_RATE:
+                raise ValueError(f"Expected {SAMPLE_RATE} Hz audio, got {rate} Hz.")
         self.load()
         with self._lock:
             segments, _info = self._model.transcribe(
-                str(audio) if isinstance(audio, Path) else audio,
+                audio,
                 language=self.language,
                 beam_size=5,
                 vad_filter=True,
@@ -118,7 +138,7 @@ class Transcriber:
         with self._lock:
             segments, _ = self._model.transcribe(audio, beam_size=5, vad_filter=False)
             list(segments)  # segments are lazy; force decoding
-        return (time.perf_counter() - start) / (len(audio) / 16_000)
+        return (time.perf_counter() - start) / (len(audio) / SAMPLE_RATE)
 
 
 def format_timestamp(seconds: float) -> str:

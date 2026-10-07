@@ -44,6 +44,13 @@ dependencies = [
   "uvicorn>=0.30",
 ]
 
+[project.optional-dependencies]
+# NVIDIA GPU acceleration on Windows and Linux (cuBLAS 12 + cuDNN 9 as pip wheels).
+cuda = [
+  "nvidia-cublas-cu12; sys_platform != 'darwin' and platform_machine in 'x86_64 AMD64'",
+  "nvidia-cudnn-cu12>=9,<10; sys_platform != 'darwin' and platform_machine in 'x86_64 AMD64'",
+]
+
 [project.urls]
 Homepage = "https://github.com/RogerHerazo/chronicler"
 Issues = "https://github.com/RogerHerazo/chronicler/issues"

@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from chronicler import cuda
 from chronicler.audio import devices
 from chronicler.campaign.notes import DEFAULT_TOKEN_BUDGET, load_notes
 from chronicler.config import Settings
@@ -149,33 +150,25 @@ def _gpu(settings: Settings) -> Callable[[], tuple[Status, str, str]]:
     def run() -> tuple[Status, str, str]:
         if settings.whisper_device == "cpu":
             return "ok", "GPU disabled in Settings; transcribing on the CPU.", ""
+        explicit = settings.whisper_device == "cuda"
         count = cuda_device_count()
         if count == 0:
-            status: Status = "fail" if settings.whisper_device == "cuda" else "warn"
             return (
-                status,
-                "No CUDA GPU detected; transcription will run on the CPU (slower).",
-                "With an NVIDIA GPU, install the latest driver. CPU mode works but uses a "
-                "smaller model.",
+                "fail" if explicit else "warn",
+                "No NVIDIA GPU detected; transcription runs on the CPU with a smaller model.",
+                "With an NVIDIA GPU, install the latest driver. CPU mode works fine for "
+                "most sessions.",
             )
-        try:
-            import ctranslate2
-
-            # Loading cuBLAS/cuDNN happens lazily; force it with a tiny allocation.
-            ctranslate2.get_supported_compute_types("cuda")
-            from faster_whisper import WhisperModel
-
-            if model_is_cached("tiny"):
-                WhisperModel("tiny", device="cuda", compute_type="float16")
-        except Exception as e:
+        missing = cuda.missing_libraries()
+        if missing:
+            fallback = "" if explicit else " Falling back to the CPU (slower)."
             return (
-                "fail",
-                f"CUDA GPU found but it cannot be used: {e}",
-                "Install the NVIDIA cuBLAS and cuDNN 9 libraries for CUDA 12 "
-                "(pip install nvidia-cublas-cu12 nvidia-cudnn-cu12, or see the faster-whisper "
-                "README), or set the transcription device to CPU in Settings.",
+                "fail" if explicit else "warn",
+                f"NVIDIA GPU found, but CUDA libraries are missing: {', '.join(missing)}."
+                + fallback,
+                cuda.INSTALL_HINT,
             )
-        return "ok", f"{count} CUDA device(s) available.", ""
+        return "ok", f"{count} NVIDIA GPU(s) ready.", ""
 
     return run
 
