@@ -109,7 +109,7 @@
   <h2>Campaign settings</h2>
   <form method="post" action="/campaigns/{{ campaign.id }}" class="form">
     <label>Name <input name="name" value="{{ campaign.name }}" required></label>
-    <label>Notes folder <span class="muted">(optional)</span>
+    <label><span>Notes folder <span class="muted">(optional)</span></span>
       <input name="notes_dir" value="{{ campaign.notes_dir or '' }}" placeholder="Folder with .md / .txt notes">
       {% if notes.error %}<small class="hint text-fail">{{ notes.error }}</small>
       {% elif notes.files %}<small class="hint">{{ notes.files|length }} file{{ 's' if notes.files|length != 1 }}, about {{ '{:,}'.format(notes.tokens) }} tokens{% if notes.truncated %}; {{ notes.skipped|length }} skipped to fit the budget{% endif %}.</small>
@@ -121,7 +121,7 @@
     <summary>Start another campaign</summary>
     <form method="post" action="/campaigns" class="form">
       <label>Name <input name="name" required></label>
-      <label>Notes folder <span class="muted">(optional)</span> <input name="notes_dir"></label>
+      <label><span>Notes folder <span class="muted">(optional)</span></span> <input name="notes_dir"></label>
       <button class="btn" type="submit">Create</button>
     </form>
   </details>

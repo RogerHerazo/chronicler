@@ -1,9 +1,9 @@
 {% set results = state.doctor_results.values() | list %}
 {% set done = results | length %}
 {% if done < total|default(9) %}
-<div class="callout callout-info"><span class="spinner" aria-hidden="true"></span> Running checks… {{ done }} of {{ total|default(9) }} done.</div>
+<div class="callout callout-info callout-row"><span class="spinner" aria-hidden="true"></span> Running checks… {{ done }} of {{ total|default(9) }} done.</div>
 {% elif blocking %}
 <div class="callout callout-fail">{{ blocking|length }} problem{{ 's' if blocking|length != 1 }} must be fixed before you can record. See the hints below.</div>
 {% else %}
-<div class="callout callout-ok">All set. <a class="btn btn-primary btn-sm" href="/live">Go to the live session</a></div>
+<div class="callout callout-ok callout-row">All set. <a class="btn btn-primary btn-sm" href="/live">Go to the live session</a></div>
 {% endif %}

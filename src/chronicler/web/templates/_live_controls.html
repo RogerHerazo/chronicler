@@ -4,7 +4,7 @@
       <h1>Recording</h1>
       <p class="muted">{{ campaign.name }} · started {{ session.started_at | dt('%H:%M') }}</p>
     {% elif session %}
-      <h1>{{ session.title or 'Last session' }}</h1>
+      <h1>{{ session.title or 'Session of ' ~ (session.started_at | dt('%A %d %B')) }}</h1>
       <p class="muted">{{ campaign.name }} · {{ session.started_at | dt }}{% if session.status == 'finished' %} · finished{% endif %}</p>
     {% else %}
       <h1>{{ campaign.name }}</h1>

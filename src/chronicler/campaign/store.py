@@ -470,7 +470,7 @@ class Store:
             "SELECT e.*, GROUP_CONCAT(m.note, char(31)) AS mention_notes "
             "FROM mentions m JOIN entities e ON e.id = m.entity_id "
             "WHERE m.session_id = ? AND e.status != 'dismissed' "
-            "GROUP BY e.id ORDER BY e.kind, e.name COLLATE NOCASE",
+            "GROUP BY e.id ORDER BY MIN(m.id)",
             (session_id,),
         )
         out = []

@@ -168,7 +168,7 @@ def _gpu(settings: Settings) -> Callable[[], tuple[Status, str, str]]:
                 + fallback,
                 cuda.INSTALL_HINT,
             )
-        return "ok", f"{count} NVIDIA GPU(s) ready.", ""
+        return "ok", f"NVIDIA GPU ready ({count} found).", ""
 
     return run
 

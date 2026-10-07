@@ -456,6 +456,7 @@ textarea {
   padding: 0.5rem 0.65rem;
   width: 100%;
   min-width: 0;
+  font-weight: 400;
 }
 
 select {
@@ -573,7 +574,8 @@ input[type="radio"] {
   position: sticky;
   bottom: 0;
   padding: 0.75rem 0;
-  background: linear-gradient(transparent, var(--bg) 35%);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
 .segmented {
@@ -621,10 +623,6 @@ input[type="radio"] {
 /* --- callouts, tags, badges -------------------------------------------------- */
 
 .callout {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;
@@ -645,7 +643,14 @@ input[type="radio"] {
   background: var(--info-soft);
 }
 
-.callout .btn {
+.callout-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.callout-row .btn {
   margin-left: auto;
 }
 
@@ -811,6 +816,7 @@ input[type="radio"] {
 }
 
 .check-fix {
+  overflow-wrap: anywhere;
   margin-top: 0.4rem;
   padding: 0.5rem 0.7rem;
   border-left: 3px solid var(--warn);
@@ -1248,8 +1254,22 @@ input[type="radio"] {
     height: 40px;
   }
 
+  .nav {
+    justify-content: space-between;
+  }
+
   .nav a {
-    padding: 0 0.6rem;
+    padding: 0 0.15rem;
+    font-size: 0.9rem;
+  }
+
+  .page-head .actions,
+  .page-head .actions form {
+    width: 100%;
+  }
+
+  .page-head .actions .btn {
+    width: 100%;
   }
 
   .page {
