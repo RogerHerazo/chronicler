@@ -60,6 +60,10 @@ def _local_dt(value: str | None, fmt: str = "%a %d %b %Y, %H:%M") -> str:
     return datetime.fromisoformat(value).astimezone().strftime(fmt)
 
 
+def minutes(value: float) -> str:
+    return "1 minute" if value == 1 else f"{value:g} minutes"
+
+
 def meter_pct(db: float) -> int:
     """Map -60..0 dBFS to a 0..100 meter width."""
     return max(0, min(100, round((db + 60) / 60 * 100)))
@@ -84,6 +88,7 @@ def create_app(
     templates.env.filters["md"] = lambda text: _md.render(text or "")
     templates.env.filters["dt"] = _local_dt
     templates.env.filters["meter_pct"] = meter_pct
+    templates.env.filters["minutes"] = minutes
     templates.env.globals["version"] = __version__
 
     def render(request: Request, name: str, **ctx: Any) -> HTMLResponse:

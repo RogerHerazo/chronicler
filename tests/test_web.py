@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from chronicler.audio import devices
 from chronicler.audio.devices import DeviceInfo
 from chronicler.config import Settings
-from chronicler.web.app import create_app, meter_pct
+from chronicler.web.app import create_app, meter_pct, minutes
 from chronicler.web.state import AppState
 from tests.conftest import FakeProvider, FakeTranscriber
 
@@ -144,3 +144,9 @@ def test_meter_pct() -> None:
     assert meter_pct(-90) == 0
     assert meter_pct(0) == 100
     assert meter_pct(-30) == 50
+
+
+def test_minutes() -> None:
+    assert minutes(1) == "1 minute"
+    assert minutes(15.0) == "15 minutes"
+    assert minutes(7.5) == "7.5 minutes"

@@ -48,6 +48,12 @@ uv tool install chronicler-dnd
 chronicler
 ```
 
+Until the first PyPI release, install straight from GitHub instead:
+
+```powershell
+uv tool install "chronicler-dnd[cuda] @ git+https://github.com/RogerHerazo/chronicler"
+```
+
 Your browser opens on the health check.
 When everything is green, create a campaign and press **Start new session**.
 

@@ -1,7 +1,7 @@
 {% if not session %}
 <section class="empty">
   <h2>Ready when you are</h2>
-  <p>Start a session when the game begins. Every {{ '%g' | format(chunk_minutes|default(settings.chunk_minutes)) }} minutes Chronicler transcribes the latest part and updates the recap, the people and places that came up, and the open threads.</p>
+  <p>Start a session when the game begins. Every {{ chunk_minutes|default(settings.chunk_minutes)|minutes }} Chronicler transcribes the latest part and updates the recap, the people and places that came up, and the open threads.</p>
   <p class="muted">Everyone at the table should know they are being recorded.</p>
 </section>
 {% else %}
@@ -12,7 +12,7 @@
       {% if session.recap %}
         <div class="prose">{{ session.recap | md | safe }}</div>
       {% else %}
-        <p class="muted">The first recap appears after the first part is analyzed{% if recording %}, about {{ '%g' | format(chunk_minutes) }} minutes into the session{% endif %}.</p>
+        <p class="muted">The first recap appears after the first part is analyzed{% if recording %}, about {{ chunk_minutes|minutes }} into the session{% endif %}.</p>
       {% endif %}
     </section>
     {% set done = chunks | selectattr('status', 'equalto', 'done') | list %}
