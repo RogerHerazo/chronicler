@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Settings · Chronicler{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p class="muted">Changes apply to the next session. The health check runs again after you save.</p>
+  </div>
+</div>
+{% if saved %}<div class="callout callout-ok">Settings saved. <a href="/doctor">Run the health check</a></div>{% endif %}
+<form method="post" action="/settings" class="settings">
+  <section class="card">
+    <h2>Audio</h2>
+    {% if device_error %}<div class="callout callout-fail">{{ device_error }}</div>{% endif %}
+    <div class="form-grid">
+      <label>System audio (what your computer plays)
+        <select name="loopback_device">
+          <option value="">Default speakers</option>
+          {% for d in loopbacks %}<option value="{{ d.id }}" {% if d.id == settings.loopback_device %}selected{% endif %}>{{ d.name }}{% if d.is_default %} (default){% endif %}</option>{% endfor %}
+        </select>
+        <small class="hint">Captures Discord, your VTT and anything else you hear.</small>
+      </label>
+      <label>Microphone
+        <select name="mic_device">
+          <option value="">Default microphone</option>
+          {% for d in mics %}<option value="{{ d.id }}" {% if d.id == settings.mic_device %}selected{% endif %}>{{ d.name }}{% if d.is_default %} (default){% endif %}</option>{% endfor %}
+        </select>
+        <label class="check-label"><input type="checkbox" name="mic_enabled" value="true" {% if settings.mic_enabled %}checked{% endif %}> Record my microphone too</label>
+      </label>
+      <label>Analyze every
+        <span class="input-suffix"><input type="number" name="chunk_minutes" min="1" max="60" step="1" value="{{ '%g' | format(settings.chunk_minutes) }}"><span>minutes</span></span>
+        <small class="hint">Shorter means fresher notes but less context per part. 10 to 15 works well.</small>
+      </label>
+      <div>
+        <span class="label">Test</span>
+        <button class="btn" type="button" hx-post="/settings/test-audio" hx-target="#audio-test" hx-disabled-elt="this" hx-boost="false">
+          <span class="htmx-indicator spinner" aria-hidden="true"></span> Test for 3 seconds</button>
+        <small class="hint">Uses the saved devices. Play something and speak during the test.</small>
+        <div id="audio-test"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Transcription</h2>
+    <div class="form-grid">
+      <label>Spoken language
+        <select name="audio_language">
+          {% for code, name in languages %}<option value="{{ code }}" {% if (settings.audio_language or '') == code %}selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+        <small class="hint">Setting it avoids misdetection when people switch languages.</small>
+      </label>
+      <label>Whisper model
+        <select name="whisper_model">
+          {% for m in whisper_models %}<option value="{{ m }}" {% if m == settings.whisper_model %}selected{% endif %}>{% if m == 'auto' %}Automatic ({{ plan.model }}){% else %}{{ m }}{% if model_sizes.get(m) %} · {{ model_sizes[m] }} MB{% endif %}{% endif %}</option>{% endfor %}
+        </select>
+        <small class="hint">Bigger is more accurate but slower. Automatic picks large-v3-turbo on a GPU and small on a CPU.</small>
+      </label>
+      <label>Run on
+        <select name="whisper_device">
+          {% for v, n in [('auto', 'Automatic'), ('cuda', 'NVIDIA GPU (CUDA)'), ('cpu', 'CPU')] %}<option value="{{ v }}" {% if v == settings.whisper_device %}selected{% endif %}>{{ n }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Analysis</h2>
+    <div class="provider-choice" role="radiogroup" aria-label="Provider">
+      <label class="choice"><input type="radio" name="provider" value="claude" {% if settings.provider == 'claude' %}checked{% endif %}>
+        <span><strong>Claude</strong> (Anthropic API)<br><small class="muted">Best quality. Needs an API key; costs a few cents per part. Only transcript text is sent.</small></span></label>
+      <label class="choice"><input type="radio" name="provider" value="ollama" {% if settings.provider == 'ollama' %}checked{% endif %}>
+        <span><strong>Ollama</strong> (local)<br><small class="muted">Free and fully offline. Needs Ollama running and a capable model.</small></span></label>
+    </div>
+    <div class="form-grid">
+      <label>Claude model
+        <select name="claude_model">
+          {% for m in claude_models %}<option value="{{ m }}" {% if m == settings.claude_model %}selected{% endif %}>{{ m }}</option>{% endfor %}
+          {% if settings.claude_model not in claude_models %}<option value="{{ settings.claude_model }}" selected>{{ settings.claude_model }}</option>{% endif %}
+        </select>
+      </label>
+      <label>Anthropic API key
+        <input type="password" name="anthropic_api_key" autocomplete="off" placeholder="{{ {'env': 'Set by ANTHROPIC_API_KEY', 'keychain': 'Saved in your OS keychain', 'missing': 'sk-ant-…'}[key_source] }}">
+        <small class="hint">{% if key_source == 'missing' %}Stored in your OS keychain, never in a file. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key</a>.{% else %}Leave empty to keep the current key.{% endif %}</small>
+      </label>
+      <label>Ollama address <input name="ollama_url" value="{{ settings.ollama_url }}"></label>
+      <label>Ollama model <input name="ollama_model" value="{{ settings.ollama_model }}">
+        <small class="hint">A model with at least 14B parameters gives usable notes.</small></label>
+      <label>Write notes in <input name="notes_language" value="{{ settings.notes_language }}">
+        <small class="hint">Notes can be in a different language from the table.</small></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Files</h2>
+    <div class="form-grid">
+      <label class="span-2">Export folder
+        <input name="export_dir" value="{{ settings.export_dir or '' }}" placeholder="{{ settings.data_dir }}{{ '\\' if '\\' in settings.data_dir|string else '/' }}exports">
+        <small class="hint">Each session gets a folder with live_notes.md, transcript.txt and summary.md. Point this at your notes vault (Obsidian, etc.) if you like. Audio stays in {{ settings.data_dir }}.</small>
+      </label>
+    </div>
+  </section>
+  <div class="sticky-actions"><button class="btn btn-primary" type="submit">Save settings</button></div>
+</form>
+{% endblock %}

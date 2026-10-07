@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Welcome · Chronicler{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Welcome to Chronicler</h1>
+  <p class="lead">Chronicler listens to your table, transcribes it on this computer and keeps a running recap, a list of who and what came up, and the open threads, while you play.</p>
+</section>
+<section class="card narrow">
+  <h2>Create your campaign</h2>
+  <form method="post" action="/campaigns" class="form">
+    <label>Campaign name
+      <input name="name" required placeholder="e.g. Curse of Strahd" autocomplete="off">
+    </label>
+    <label>Campaign notes folder <span class="muted">(optional)</span>
+      <input name="notes_dir" placeholder="C:\Users\you\Documents\Campaign notes" autocomplete="off">
+      <small class="hint">A folder of Markdown or text files about your world: characters, places, factions. Chronicler uses it to spell names right and connect the dots. No notes yet? Skip this: the built-in tracker learns the world as you play.</small>
+    </label>
+    <button class="btn btn-primary" type="submit">Create campaign</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% if error %}
+<div class="callout callout-fail">{{ error }}</div>
+{% else %}
+<ul class="audio-test">
+  {% for label, peak in peaks.items() %}
+  <li>
+    <span>{{ {'system': 'System audio', 'mic': 'Microphone'}.get(label, label) }}</span>
+    <span class="meter"><span class="meter-fill" style="width: {{ peak | meter_pct }}%"></span></span>
+    <span class="mono">{{ '%.0f' | format(peak) }} dB</span>
+    {% if peak < -55 %}<span class="text-warn">silent: play something or speak during the test</span>{% else %}<span class="text-ok">OK</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

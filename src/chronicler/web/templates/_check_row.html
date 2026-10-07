@@ -1,0 +1,27 @@
+{% if result %}
+<li class="check check-{{ result.status }}" id="check-{{ check.id }}">
+  <span class="check-icon" aria-hidden="true">{{ {'ok': '✓', 'warn': '!', 'fail': '✕', 'skip': '–'}[result.status] }}</span>
+  <div class="check-body">
+    <div class="check-title">{{ check.title }}
+      {% if result.status == 'fail' and not result.blocking %}<span class="tag">optional</span>{% endif %}
+    </div>
+    <div class="check-detail">{{ result.detail }}</div>
+    {% if result.fix %}<div class="check-fix">{{ result.fix }}</div>{% endif %}
+  </div>
+  <div class="check-actions">
+    {% if check.id == 'model' and result.status == 'warn' %}
+    <button class="btn btn-sm" hx-post="/doctor/download-model" hx-target="#check-model" hx-swap="outerHTML" hx-disabled-elt="this">
+      <span class="htmx-indicator spinner" aria-hidden="true"></span> Download now</button>
+    {% endif %}
+    <button class="btn btn-ghost btn-sm" hx-post="/doctor/check/{{ check.id }}" hx-target="#check-{{ check.id }}" hx-swap="outerHTML" hx-disabled-elt="this" title="Run this check again">Recheck</button>
+  </div>
+</li>
+{% else %}
+<li class="check check-pending" id="check-{{ check.id }}" hx-post="/doctor/check/{{ check.id }}" hx-trigger="load" hx-swap="outerHTML">
+  <span class="check-icon" aria-hidden="true"><span class="spinner"></span></span>
+  <div class="check-body">
+    <div class="check-title">{{ check.title }}</div>
+    <div class="check-detail muted">{{ 'Measuring… this loads the Whisper model and can take a minute.' if check.slow else 'Checking…' }}</div>
+  </div>
+</li>
+{% endif %}

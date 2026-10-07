@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sessions · Chronicler{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Sessions</h1>
+    <p class="muted">{{ campaign.name }}</p>
+  </div>
+</div>
+{% if sessions %}
+<ul class="session-list">
+  {% for s in sessions %}
+  <li>
+    <a class="session-row" href="/sessions/{{ s.id }}">
+      <div>
+        <div class="session-title">{{ s.title or 'Untitled session' }}</div>
+        <div class="muted small">{{ s.started_at | dt }} · {{ counts[s.id] }} part{{ 's' if counts[s.id] != 1 }}</div>
+      </div>
+      <span class="badge badge-{{ s.status }}">{{ {'recording': 'Recording', 'stopped': 'Not summarized', 'finished': 'Summarized'}[s.status] }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="empty"><h2>No sessions yet</h2><p><a href="/live">Start your first session</a> when the game begins.</p></section>
+{% endif %}
+{% endblock %}

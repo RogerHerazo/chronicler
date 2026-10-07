@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Live · Chronicler{% endblock %}
+{% block content %}
+<div id="live-controls" hx-get="/live/controls" hx-trigger="sse:session" hx-swap="innerHTML">
+  {% include "_live_controls.html" %}
+</div>
+<div id="live-panel" hx-get="/live/panel" hx-trigger="sse:chunk, sse:session_updated, sse:session delay:300ms" hx-swap="innerHTML">
+  {% include "_live_panel.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% if not session %}
+<section class="empty">
+  <h2>Ready when you are</h2>
+  <p>Start a session when the game begins. Every {{ '%g' | format(chunk_minutes|default(settings.chunk_minutes)) }} minutes Chronicler transcribes the latest part and updates the recap, the people and places that came up, and the open threads.</p>
+  <p class="muted">Everyone at the table should know they are being recorded.</p>
+</section>
+{% else %}
+<div class="live-grid">
+  <div class="col-main">
+    <section class="card">
+      <h2>Recap</h2>
+      {% if session.recap %}
+        <div class="prose">{{ session.recap | md | safe }}</div>
+      {% else %}
+        <p class="muted">The first recap appears after the first part is analyzed{% if recording %}, about {{ '%g' | format(chunk_minutes) }} minutes into the session{% endif %}.</p>
+      {% endif %}
+    </section>
+    {% set done = chunks | selectattr('status', 'equalto', 'done') | list %}
+    {% if done %}
+    <section class="card">
+      <h2>Timeline</h2>
+      <ol class="timeline">
+        {% for c in done | reverse %}
+        <li>
+          <div class="timeline-head">Part {{ c.idx + 1 }} <span class="muted mono">{{ c.start_s | ts }} – {{ c.end_s | ts }}</span></div>
+          <ul>{% for b in (c.analysis or {}).get('beats', []) %}<li>{{ b }}</li>{% endfor %}</ul>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+  </div>
+  <div class="col-side">
+    <section class="card">
+      <h2>Open threads</h2>
+      {% if open_threads %}
+      <ul class="threads">
+        {% for t, ev in open_threads %}
+        <li><span class="thread-kind kind-{{ ev[-1][0] }}">{{ ev[-1][0] }}</span><strong>{{ t.title }}</strong><div class="muted">{{ ev[-1][1] }}</div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">None yet.</p>{% endif %}
+      {% if resolved_threads %}
+      <details class="resolved"><summary>{{ resolved_threads|length }} resolved this session</summary>
+        <ul class="threads">{% for t, ev in resolved_threads %}<li><strong>{{ t.title }}</strong><div class="muted">{{ ev[-1][1] }}</div></li>{% endfor %}</ul>
+      </details>
+      {% endif %}
+    </section>
+    <section class="card">
+      <h2>Who and what came up</h2>
+      {% if new_entities or known_entities %}
+        {% if new_entities %}
+        <h3>New this session</h3>
+        <ul class="entities">{% for e, notes in new_entities %}{% include "_entity_item.html" %}{% endfor %}</ul>
+        {% endif %}
+        {% if known_entities %}
+        <h3>Known</h3>
+        <ul class="entities">{% for e, notes in known_entities %}{% include "_entity_item.html" %}{% endfor %}</ul>
+        {% endif %}
+        <p class="hint"><a href="/campaign">Review suggestions</a> to fix spellings and merge duplicates.</p>
+      {% else %}<p class="muted">Nothing yet.</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Parts</h2>
+      {% if chunks or recording %}
+      <ul class="parts">
+        {% for c in chunks %}
+        <li class="part part-{{ c.status }}">
+          <span class="part-name">Part {{ c.idx + 1 }}</span>
+          <span class="mono muted">{{ c.start_s | ts }}</span>
+          <span class="part-status">
+            {% if c.status in ('transcribing', 'analyzing') %}<span class="spinner" aria-hidden="true"></span>{% endif %}
+            {{ {'queued': 'Waiting', 'transcribing': 'Transcribing', 'analyzing': 'Analyzing', 'done': 'Done', 'failed': 'Failed'}[c.status] }}
+          </span>
+          {% if c.status == 'failed' %}
+            <div class="part-error">{{ c.error }}</div>
+            <button class="btn btn-sm" hx-post="/chunks/{{ c.id }}/retry" hx-swap="none" hx-boost="false">Retry</button>
+          {% endif %}
+        </li>
+        {% endfor %}
+        {% if recording %}
+        <li class="part part-recording"><span class="part-name">Part {{ chunks|length + 1 }}</span><span class="part-status"><span class="rec-dot" aria-hidden="true"></span> Recording</span></li>
+        {% endif %}
+      </ul>
+      {% else %}<p class="muted">No audio yet.</p>{% endif %}
+    </section>
+    {% if transcript_tail %}
+    <section class="card">
+      <h2>Latest transcript</h2>
+      <ol class="transcript">
+        {% for seg in transcript_tail %}<li><span class="mono muted">{{ seg.start | ts }}</span> {{ seg.text }}</li>{% endfor %}
+      </ol>
+      <p class="hint"><a href="/sessions/{{ session.id }}?tab=transcript">Full transcript</a></p>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

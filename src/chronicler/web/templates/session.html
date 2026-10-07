@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title or 'Session' }} · Chronicler{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="crumb"><a href="/sessions">Sessions</a></p>
+    <h1>{{ session.title or 'Untitled session' }}</h1>
+    <p class="muted">{{ session.started_at | dt }}</p>
+  </div>
+  <div class="actions">
+    <button class="btn" hx-post="/sessions/{{ session.id }}/open-folder" hx-swap="none" hx-boost="false" title="{{ export_dir }}">Open export folder</button>
+    {% if session.status != 'recording' %}
+    <button class="btn btn-primary" hx-post="/sessions/{{ session.id }}/finish" hx-target="#finish-result" hx-disabled-elt="this" hx-boost="false">
+      <span class="htmx-indicator spinner" aria-hidden="true"></span> {{ 'Rewrite summary' if session.summary_json else 'Finish & summarize' }}</button>
+    {% endif %}
+  </div>
+</div>
+<div id="finish-result"></div>
+<nav class="tabs" aria-label="Session views">
+  <a href="?tab=summary" {% if tab == 'summary' %}aria-current="page"{% endif %}>Summary</a>
+  <a href="?tab=live" {% if tab == 'live' %}aria-current="page"{% endif %}>Live notes</a>
+  <a href="?tab=transcript" {% if tab == 'transcript' %}aria-current="page"{% endif %}>Transcript</a>
+</nav>
+<section class="card">
+  {% if tab == 'summary' %}
+    {% if summary_md %}<div class="prose">{{ summary_md | md | safe }}</div>
+    {% else %}<p class="muted">No summary yet. Use <strong>Finish &amp; summarize</strong> after the session to write one from the full transcript.</p>{% endif %}
+  {% elif tab == 'live' %}
+    {% if live_notes_md %}<div class="prose">{{ live_notes_md | md | safe }}</div>
+    {% else %}<p class="muted">No live notes were written for this session.</p>{% endif %}
+  {% else %}
+    {% set any = namespace(found=false) %}
+    <ol class="transcript transcript-full">
+    {% for c in chunks %}
+      {% if c.transcript_json is not none %}{% set any.found = true %}
+        <li class="transcript-part">Part {{ c.idx + 1 }}</li>
+        {% for seg in c.transcript %}<li><span class="mono muted">{{ seg.start | ts }}</span> {{ seg.text }}</li>{% endfor %}
+      {% endif %}
+    {% endfor %}
+    </ol>
+    {% if not any.found %}<p class="muted">No transcript yet.</p>{% endif %}
+  {% endif %}
+</section>
+<p class="hint">Files: <span class="mono">{{ export_dir }}</span></p>
+{% endblock %}

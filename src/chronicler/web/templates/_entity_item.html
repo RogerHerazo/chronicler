@@ -1,0 +1,4 @@
+<li class="entity">
+  <div><span class="kind kind-{{ e.kind }}">{{ e.kind }}</span> <strong>{{ e.name }}</strong>{% if e.status == 'suggested' %} <span class="tag" title="Suggested by the AI. Confirm or fix it on the Campaign page.">unconfirmed</span>{% endif %}</div>
+  {% if notes %}<div class="muted">{{ notes[-1] }}</div>{% endif %}
+</li>

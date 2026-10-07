@@ -1,0 +1,47 @@
+<div class="page-head">
+  <div>
+    {% if recording %}
+      <h1>Recording</h1>
+      <p class="muted">{{ campaign.name }} · started {{ session.started_at | dt('%H:%M') }}</p>
+    {% elif session %}
+      <h1>{{ session.title or 'Last session' }}</h1>
+      <p class="muted">{{ campaign.name }} · {{ session.started_at | dt }}{% if session.status == 'finished' %} · finished{% endif %}</p>
+    {% else %}
+      <h1>{{ campaign.name }}</h1>
+      <p class="muted">No sessions yet.</p>
+    {% endif %}
+  </div>
+  <div class="actions">
+    {% if recording %}
+      <form method="post" action="/live/stop"><button class="btn btn-danger" type="submit"><span class="icon-stop" aria-hidden="true"></span> Stop recording</button></form>
+    {% else %}
+      {% if session and session.status == 'stopped' %}
+        <form method="post" action="/live/start"><input type="hidden" name="continue_session_id" value="{{ session.id }}">
+          <button class="btn" type="submit" {% if blocking %}disabled{% endif %}>Continue this session</button></form>
+        <button class="btn" hx-post="/sessions/{{ session.id }}/finish" hx-target="#finish-result" hx-disabled-elt="this" hx-boost="false">
+          <span class="htmx-indicator spinner" aria-hidden="true"></span> Finish &amp; summarize</button>
+      {% endif %}
+      <form method="post" action="/live/start"><button class="btn btn-primary" type="submit" {% if blocking %}disabled title="Fix the failing health checks first"{% endif %}><span class="rec-dot" aria-hidden="true"></span> Start new session</button></form>
+    {% endif %}
+  </div>
+</div>
+<div id="finish-result"></div>
+{% if blocking and not recording %}
+<div class="callout callout-fail">Recording is disabled until the <a href="/doctor">health check</a> passes.</div>
+{% endif %}
+{% if recording %}
+<section class="status-strip" id="status-strip" data-recording="1">
+  <div class="stat">
+    <div class="stat-label">Elapsed</div>
+    <div class="stat-value mono" data-elapsed>0:00:00</div>
+  </div>
+  <div class="stat stat-grow">
+    <div class="stat-label">Next part analyzed in <span class="mono" data-countdown>–</span></div>
+    <div class="progress" aria-hidden="true"><div class="progress-bar" data-chunk-progress></div></div>
+  </div>
+  <div class="stat stat-meters" data-meters>
+    <div class="stat-label">Input levels</div>
+  </div>
+</section>
+<p class="consent">Remember: everyone at the table should know they are being recorded.</p>
+{% endif %}

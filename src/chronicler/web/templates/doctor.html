@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Health check · Chronicler{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Health check</h1>
+    <p class="muted">Checking that everything Chronicler needs is installed, running and fast enough.</p>
+  </div>
+  <a class="btn" href="/doctor">Run again</a>
+</div>
+<div id="doctor-summary" hx-get="/doctor/summary" hx-trigger="doctor-updated from:body" hx-swap="innerHTML">
+  {% include "_doctor_summary.html" %}
+</div>
+<ul class="checks">
+  {% for check in checks %}
+    {% set result = None %}
+    {% include "_check_row.html" %}
+  {% endfor %}
+</ul>
+{% endblock %}

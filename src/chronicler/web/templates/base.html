@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Chronicler{% endblock %}</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/htmx-sse.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body hx-boost="true" hx-ext="sse" sse-connect="/events">
+  <header class="topbar">
+    <a class="brand" href="/live">
+      <img src="/static/icon.svg" alt="" width="26" height="26">
+      <span>Chronicler</span>
+    </a>
+    {% set path = request.url.path %}
+    <nav class="nav">
+      <a href="/live" {% if path.startswith('/live') %}aria-current="page"{% endif %}>Live</a>
+      <a href="/campaign" {% if path.startswith('/campaign') %}aria-current="page"{% endif %}>Campaign</a>
+      <a href="/sessions" {% if path.startswith('/sessions') %}aria-current="page"{% endif %}>Sessions</a>
+      <a href="/doctor" {% if path.startswith('/doctor') %}aria-current="page"{% endif %}>Health
+        {% if blocking %}<span class="dot dot-fail" title="Some checks are failing"></span>{% endif %}</a>
+      <a href="/settings" {% if path.startswith('/settings') %}aria-current="page"{% endif %}>Settings</a>
+    </nav>
+    <div class="topbar-end">
+      {% if recording %}<span class="rec-pill" title="Recording"><span class="rec-dot"></span>REC</span>{% endif %}
+      {% if campaigns %}
+      <form method="post" action="/campaigns/select" class="campaign-switch">
+        <label class="visually-hidden" for="campaign-select">Campaign</label>
+        <select id="campaign-select" name="campaign_id" onchange="this.form.requestSubmit()" {% if recording %}disabled{% endif %}>
+          {% for c in campaigns %}
+          <option value="{{ c.id }}" {% if campaign and c.id == campaign.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+  <div id="toast" role="alert" aria-live="assertive"></div>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">Chronicler {{ version }} · audio never leaves this computer</footer>
+</body>
+</html>

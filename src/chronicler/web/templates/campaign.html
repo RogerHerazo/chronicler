@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Campaign · Chronicler{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ campaign.name }}</h1>
+    <p class="muted">Everything Chronicler has learned about your world. Suggestions come from the AI; confirm them, fix spellings or merge duplicates so later sessions get names right.</p>
+  </div>
+  <div class="segmented" role="tablist">
+    <a href="/campaign" role="tab" {% if show != 'dismissed' %}aria-selected="true"{% endif %}>Active</a>
+    <a href="/campaign?show=dismissed" role="tab" {% if show == 'dismissed' %}aria-selected="true"{% endif %}>Dismissed</a>
+  </div>
+</div>
+
+<div class="campaign-grid">
+<section class="card" id="entities">
+  <div class="card-head">
+    <h2>People, places &amp; things <span class="count">{{ entities|length }}</span></h2>
+  </div>
+  {% if show != 'dismissed' %}
+  <form method="post" action="/entities/add" class="inline-form">
+    <input name="name" placeholder="Add a name you want spelled right" required aria-label="Name">
+    <select name="kind" aria-label="Kind">
+      {% for k in ['npc','place','item','faction','other'] %}<option value="{{ k }}">{{ k|upper if k == 'npc' else k|capitalize }}</option>{% endfor %}
+    </select>
+    <button class="btn" type="submit">Add</button>
+  </form>
+  {% endif %}
+  {% if entities %}
+  <ul class="tracker">
+    {% for e in entities %}
+    <li class="tracker-item status-{{ e.status }}">
+      <details>
+        <summary>
+          <span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>
+          <strong>{{ e.name }}</strong>
+          {% if e.aliases %}<span class="muted small">also: {{ e.aliases|join(', ') }}</span>{% endif %}
+          {% if e.status == 'suggested' %}<span class="tag">unconfirmed</span>{% endif %}
+          <span class="tracker-quick">
+            {% if e.status == 'suggested' %}
+            <form method="post" action="/entities/{{ e.id }}"><button class="btn btn-sm" name="action" value="confirm">Confirm</button></form>
+            {% endif %}
+            {% if e.status == 'dismissed' %}
+            <form method="post" action="/entities/{{ e.id }}"><button class="btn btn-sm" name="action" value="restore">Restore</button></form>
+            {% else %}
+            <form method="post" action="/entities/{{ e.id }}"><button class="btn btn-ghost btn-sm" name="action" value="dismiss" title="Not a real entity, or not worth tracking">Dismiss</button></form>
+            {% endif %}
+          </span>
+        </summary>
+        <div class="tracker-edit">
+          <form method="post" action="/entities/{{ e.id }}" class="form form-grid">
+            <label>Name <input name="name" value="{{ e.name }}"></label>
+            <label>Kind
+              <select name="kind">{% for k in ['npc','place','item','faction','other'] %}<option value="{{ k }}" {% if k == e.kind %}selected{% endif %}>{{ k|upper if k == 'npc' else k|capitalize }}</option>{% endfor %}</select>
+            </label>
+            <label class="span-2">Notes <textarea name="notes" rows="2">{{ e.notes }}</textarea></label>
+            <div class="span-2"><button class="btn btn-primary btn-sm" name="action" value="save">Save &amp; confirm</button></div>
+          </form>
+          {% set others = entities | rejectattr('id', 'equalto', e.id) | list %}
+          {% if others %}
+          <form method="post" action="/entities/{{ e.id }}" class="inline-form">
+            <label class="muted small" for="merge-{{ e.id }}">Same as</label>
+            <select id="merge-{{ e.id }}" name="merge_into">{% for o in others %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
+            <button class="btn btn-sm" name="action" value="merge" title="Fold this entry into the other one; its name becomes an alias">Merge</button>
+          </form>
+          {% endif %}
+        </div>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">{{ 'Nothing dismissed.' if show == 'dismissed' else 'Nothing yet. Names show up here as sessions are analyzed.' }}</p>
+  {% endif %}
+</section>
+
+<div class="col-side">
+<section class="card" id="threads">
+  <h2>Threads <span class="count">{{ threads|length }}</span></h2>
+  {% if threads %}
+  <ul class="tracker">
+    {% for t in threads %}
+    <li class="tracker-item status-{{ t.status }} {% if t.state == 'resolved' %}is-resolved{% endif %}">
+      <details>
+        <summary>
+          <span class="thread-state state-{{ t.state }}">{{ t.state }}</span>
+          <strong>{{ t.title }}</strong>
+          {% if t.status == 'suggested' %}<span class="tag">unconfirmed</span>{% endif %}
+        </summary>
+        <div class="tracker-edit">
+          <form method="post" action="/threads/{{ t.id }}" class="inline-form">
+            <input name="title" value="{{ t.title }}" aria-label="Title">
+            <button class="btn btn-sm" name="action" value="save">Save</button>
+          </form>
+          <form method="post" action="/threads/{{ t.id }}" class="button-row">
+            {% if t.status == 'suggested' %}<button class="btn btn-sm" name="action" value="confirm">Confirm</button>{% endif %}
+            {% if t.state == 'open' %}<button class="btn btn-sm" name="action" value="resolve">Mark resolved</button>{% else %}<button class="btn btn-sm" name="action" value="reopen">Reopen</button>{% endif %}
+            {% if t.status == 'dismissed' %}<button class="btn btn-sm" name="action" value="restore">Restore</button>{% else %}<button class="btn btn-ghost btn-sm" name="action" value="dismiss">Dismiss</button>{% endif %}
+          </form>
+        </div>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No threads yet.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Campaign settings</h2>
+  <form method="post" action="/campaigns/{{ campaign.id }}" class="form">
+    <label>Name <input name="name" value="{{ campaign.name }}" required></label>
+    <label>Notes folder <span class="muted">(optional)</span>
+      <input name="notes_dir" value="{{ campaign.notes_dir or '' }}" placeholder="Folder with .md / .txt notes">
+      {% if notes.error %}<small class="hint text-fail">{{ notes.error }}</small>
+      {% elif notes.files %}<small class="hint">{{ notes.files|length }} file{{ 's' if notes.files|length != 1 }}, about {{ '{:,}'.format(notes.tokens) }} tokens{% if notes.truncated %}; {{ notes.skipped|length }} skipped to fit the budget{% endif %}.</small>
+      {% endif %}
+    </label>
+    <button class="btn" type="submit">Save</button>
+  </form>
+  <details class="new-campaign">
+    <summary>Start another campaign</summary>
+    <form method="post" action="/campaigns" class="form">
+      <label>Name <input name="name" required></label>
+      <label>Notes folder <span class="muted">(optional)</span> <input name="notes_dir"></label>
+      <button class="btn" type="submit">Create</button>
+    </form>
+  </details>
+</section>
+</div>
+</div>
+{% endblock %}
