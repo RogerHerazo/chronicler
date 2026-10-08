@@ -31,12 +31,21 @@
         <span class="input-suffix"><input type="number" name="chunk_minutes" min="1" max="60" step="1" value="{{ '%g' | format(settings.chunk_minutes) }}"><span>minutes</span></span>
         <small class="hint">Shorter means fresher notes but less context per part. 10 to 15 works well.</small>
       </label>
-      <div>
-        <span class="label">Test</span>
-        <button class="btn" type="button" hx-post="/settings/test-audio" hx-target="#audio-test" hx-disabled-elt="this" hx-boost="false">
-          <span class="htmx-indicator spinner" aria-hidden="true"></span> Test for 3 seconds</button>
-        <small class="hint">Uses the saved devices. Play something and speak during the test.</small>
-        <div id="audio-test"></div>
+      <div class="span-2" data-monitor>
+        <span class="label">Input levels</span>
+        <div class="button-row">
+          <button class="btn" type="button" data-monitor-start>Check levels</button>
+          <button class="btn btn-ghost" type="button" data-monitor-stop hidden>Stop</button>
+          <span class="muted small" data-monitor-status></span>
+        </div>
+        <div class="monitor" data-meters></div>
+        <div class="callout callout-fail" data-capture-error hidden></div>
+        <div class="meter-legend" aria-label="Meter colors">
+          <span class="legend-green">Normal speech</span>
+          <span class="legend-yellow">Loud speech, still fine</span>
+          <span class="legend-red">Too loud, turn the input down</span>
+        </div>
+        <small class="hint">Uses the saved devices. Talk as loudly as you do during a game while you adjust your microphone's input volume in your system sound settings: your loudest moments should reach yellow but stay out of the red.</small>
       </div>
     </div>
   </section>

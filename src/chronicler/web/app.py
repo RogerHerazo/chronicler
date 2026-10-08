@@ -8,10 +8,8 @@ import logging
 import os
 import platform
 import subprocess
-import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -25,6 +23,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from chronicler import __version__
 from chronicler.audio import devices
+from chronicler.audio.monitor import LevelMonitor
 from chronicler.audio.source import LiveSource
 from chronicler.campaign.store import Session
 from chronicler.config import get_secret, secret_source, set_secret
@@ -80,6 +79,7 @@ def create_app(
         if on_startup:
             await on_startup(state)
         yield
+        await asyncio.to_thread(stop_monitor)
         await state.pipeline.shutdown()
 
     app = FastAPI(title="Chronicler", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -112,6 +112,11 @@ def create_app(
         if session is None:
             raise HTTPException(404, "Session not found")
         return session
+
+    def stop_monitor() -> None:
+        if state.monitor is not None:
+            state.monitor.stop()
+            state.monitor = None
 
     # --- doctor ------------------------------------------------------------------
 
@@ -262,12 +267,8 @@ def create_app(
         if state.blocking_failures:
             raise HTTPException(409, "Fix the failing health checks first.")
         s = state.settings
-        try:
-            source = await asyncio.to_thread(
-                LiveSource, s.loopback_device, s.mic_device, s.mic_enabled
-            )
-        except Exception as e:
-            raise HTTPException(500, f"Could not open the audio devices: {e}") from e
+        await asyncio.to_thread(stop_monitor)  # free the devices for the session
+        source = LiveSource(s.loopback_device, s.mic_device, s.mic_enabled)
         try:
             await state.pipeline.start_recording(
                 campaign.id,
@@ -542,53 +543,36 @@ def create_app(
         state.doctor_results.clear()
         return redirect("/settings?saved=1")
 
-    @app.post("/settings/test-audio", response_class=HTMLResponse)
-    async def test_audio(request: Request) -> Response:
+    @app.post("/settings/monitor/start")
+    async def monitor_start() -> JSONResponse:
         if state.pipeline.recording:
-            return render(request, "_audio_test.html", error="Stop the recording first.")
+            raise HTTPException(409, "A session is recording; its meters are on the Live page.")
+        await asyncio.to_thread(stop_monitor)
         s = state.settings
+        monitor = LevelMonitor(LiveSource(s.loopback_device, s.mic_device, s.mic_enabled))
         try:
-            peaks = await asyncio.to_thread(
-                _measure_levels, s.loopback_device, s.mic_device, s.mic_enabled
-            )
-        except Exception as e:
-            return render(request, "_audio_test.html", error=str(e))
-        return render(request, "_audio_test.html", peaks=peaks)
+            await asyncio.to_thread(monitor.start)
+        except devices.AudioUnavailableError as e:
+            raise HTTPException(409, str(e)) from e
+        state.monitor = monitor
+        return JSONResponse(monitor.snapshot())
+
+    @app.post("/settings/monitor/stop")
+    async def monitor_stop() -> Response:
+        await asyncio.to_thread(stop_monitor)
+        return Response(status_code=204)
+
+    @app.get("/api/monitor")
+    async def monitor_status() -> JSONResponse:
+        if state.monitor is None:
+            return JSONResponse({"running": False})
+        return JSONResponse(state.monitor.snapshot())
 
     @app.get("/api/has-key")
     async def has_key() -> JSONResponse:
         return JSONResponse({"has_key": bool(get_secret("anthropic_api_key"))})
 
     return app
-
-
-@dataclass
-class LevelTest:
-    peak_db: float = -90.0
-    clipped: bool = False
-
-
-def _measure_levels(
-    loopback: str | None, mic: str | None, mic_enabled: bool, seconds: float = 3.0
-) -> dict[str, LevelTest]:
-    source = LiveSource(loopback, mic, mic_enabled)
-    source.start()
-    peaks: dict[str, LevelTest] = {}
-    deadline = time.monotonic() + seconds
-    try:
-        while time.monotonic() < deadline:
-            source.read()
-            clipping = source.clipping()
-            for label, level in source.levels().items():
-                result = peaks.setdefault(label, LevelTest())
-                result.peak_db = max(result.peak_db, level)
-                result.clipped = result.clipped or clipping.get(label, False)
-        errors = source.errors()
-        if errors:
-            raise RuntimeError("; ".join(f"{k}: {v}" for k, v in errors.items()))
-    finally:
-        source.stop()
-    return peaks
 
 
 def _open_in_file_manager(path: Path) -> None:

@@ -19,6 +19,9 @@
   --fail-soft: #fbe4e2;
   --info-soft: #e7eef8;
   --rec: #d92d20;
+  --vu-green: #3fa36b;
+  --vu-yellow: #e0b030;
+  --vu-red: #d9442f;
   --shadow: 0 1px 2px rgb(31 29 26 / 6%), 0 1px 1px rgb(31 29 26 / 4%);
   --radius: 10px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -46,6 +49,9 @@
     --fail-soft: #3d1f1c;
     --info-soft: #1f2a38;
     --rec: #ff5a4e;
+    --vu-green: #4cbf7d;
+    --vu-yellow: #f0c445;
+    --vu-red: #ff6a55;
     --shadow: none;
     color-scheme: dark;
   }
@@ -59,6 +65,11 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* Components set `display`, which would otherwise override the attribute. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -477,6 +488,7 @@ input[type="radio"] {
 .form label,
 .form-grid label,
 .form-grid > div {
+  min-width: 0;
   display: grid;
   gap: 0.35rem;
   font-weight: 600;
@@ -883,36 +895,121 @@ input[type="radio"] {
 
 .stat-meters {
   display: grid;
-  gap: 0.25rem;
-  min-width: 210px;
+  gap: 0.3rem;
+  min-width: 260px;
 }
 
+/* Level meter: green < -18 dB, yellow -18..-6 dB, red > -6 dB, on a -60..0 dB scale. */
 .meter-row {
   display: grid;
-  grid-template-columns: 4.5rem 1fr;
+  grid-template-columns: 4.5rem minmax(80px, 1fr) 3.2rem;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.78rem;
 }
 
-.meter {
+.meter-db {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.meter-row.is-clipping .meter-db {
+  color: var(--vu-red);
+  font-weight: 700;
+}
+
+.vu {
+  position: relative;
   display: block;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface-2);
+  height: 10px;
+  border-radius: 3px;
   overflow: hidden;
-  min-width: 80px;
+  background: linear-gradient(
+    to right,
+    var(--vu-green) 0 70%,
+    var(--vu-yellow) 70% 90%,
+    var(--vu-red) 90% 100%
+  );
 }
 
-.meter-fill {
-  display: block;
-  height: 100%;
-  background: var(--ok);
-  transition: width 0.1s linear;
+/* Covers the part of the scale above the current level. */
+.vu-mask {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 100%;
+  background: var(--surface-2);
+  transition: width 0.08s linear;
 }
 
-.meter-fill.is-clipping {
-  background: var(--fail);
+/* Zone boundaries stay visible on the unlit part of the scale. */
+.vu::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--border), var(--border)) 70% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--border), var(--border)) 90% 0 / 1px 100% no-repeat;
+  pointer-events: none;
+}
+
+.vu-hold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0;
+  transition: left 0.08s linear;
+}
+
+.vu-hold.is-visible {
+  opacity: 0.75;
+}
+
+.meter-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+
+.meter-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: -1px;
+}
+
+.legend-green::before {
+  background: var(--vu-green);
+}
+
+.legend-yellow::before {
+  background: var(--vu-yellow);
+}
+
+.legend-red::before {
+  background: var(--vu-red);
+}
+
+.monitor {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.monitor .meter-row {
+  grid-template-columns: 7.5rem minmax(120px, 1fr) 3.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .consent {
@@ -1002,8 +1099,7 @@ input[type="radio"] {
 .parts,
 .transcript,
 .tracker,
-.session-list,
-.audio-test {
+.session-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1189,20 +1285,6 @@ input[type="radio"] {
   font-weight: 650;
 }
 
-.audio-test {
-  margin-top: 0.75rem;
-}
-
-.audio-test li {
-  display: grid;
-  grid-template-columns: 7rem 1fr 3.5rem auto;
-  gap: 0.6rem;
-  align-items: center;
-  font-weight: 400;
-  font-size: 0.85rem;
-  padding: 0.2rem 0;
-}
-
 #toast:empty {
   display: none;
 }
@@ -1288,7 +1370,7 @@ input[type="radio"] {
     grid-column: 2;
   }
 
-  .audio-test li {
-    grid-template-columns: 6rem 1fr 3rem;
+  .monitor .meter-row {
+    grid-template-columns: 5.5rem minmax(80px, 1fr) 3.2rem;
   }
 }

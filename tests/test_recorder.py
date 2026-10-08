@@ -6,7 +6,7 @@ import numpy as np
 import soundfile as sf
 
 from chronicler.audio.recorder import AudioChunk, Recorder, choose_cut
-from chronicler.audio.source import SAMPLE_RATE, dbfs
+from chronicler.audio.source import SAMPLE_RATE, peak_dbfs
 from tests.conftest import ArraySource, speechy
 
 SR = SAMPLE_RATE
@@ -82,6 +82,8 @@ def test_recorder_drops_tiny_tail(tmp_path) -> None:
     assert chunks == []
 
 
-def test_dbfs() -> None:
-    assert dbfs(np.zeros(100, dtype=np.float32)) == -90.0
-    assert abs(dbfs(np.ones(100, dtype=np.float32)) - 0.0) < 1e-6
+def test_peak_dbfs() -> None:
+    assert peak_dbfs(np.zeros(100, dtype=np.float32)) == -90.0
+    assert abs(peak_dbfs(np.ones(100, dtype=np.float32)) - 0.0) < 1e-6
+    half = np.array([0.1, -0.5, 0.2], dtype=np.float32)
+    assert abs(peak_dbfs(half) - (-6.02)) < 0.01

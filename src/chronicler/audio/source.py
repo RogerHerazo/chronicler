@@ -24,16 +24,17 @@ log = logging.getLogger(__name__)
 SAMPLE_RATE = 16_000
 BLOCK_SECONDS = 0.1
 SILENCE_DBFS = -90.0
-CLIP_LEVEL = 0.99
+CLIP_DB = 20.0 * float(np.log10(0.99))  # a sample at 99% of full scale counts as clipped
 # How long a clipped sample keeps a device flagged as clipping.
 CLIP_HOLD_SECONDS = 2.0
 
 
-def dbfs(block: np.ndarray) -> float:
+def peak_dbfs(block: np.ndarray) -> float:
+    """Peak level in dBFS: what a recording meter shows and what clips."""
     if block.size == 0:
         return SILENCE_DBFS
-    rms = float(np.sqrt(np.mean(np.square(block, dtype=np.float64))))
-    return max(SILENCE_DBFS, 20.0 * np.log10(rms)) if rms > 0 else SILENCE_DBFS
+    peak = float(np.abs(block).max())
+    return max(SILENCE_DBFS, 20.0 * np.log10(peak)) if peak > 0 else SILENCE_DBFS
 
 
 class AudioSource(Protocol):
@@ -45,7 +46,9 @@ class AudioSource(Protocol):
 
     def stop(self) -> None: ...
 
-    def levels(self) -> dict[str, float]: ...
+    def levels(self) -> dict[str, float]:
+        """Peak level of the latest block per input, in dBFS."""
+        ...
 
     def errors(self) -> dict[str, str]: ...
 
@@ -103,11 +106,13 @@ class _DeviceStream:
         try:
             while not self._stop.is_set():
                 data = capture.read(frames)
-                if data.size and float(np.abs(data).max()) >= CLIP_LEVEL:
+                # Meter and clip detection use the raw capture, before mixing
+                # down and resampling can smooth peaks away.
+                self.level = peak_dbfs(data)
+                if self.level >= CLIP_DB:
                     self.last_clip = time.monotonic()
                 mono = data.mean(axis=1) if data.ndim == 2 else data
                 out = resampler.resample_chunk(np.ascontiguousarray(mono, dtype=np.float32))
-                self.level = dbfs(out)
                 self._push(out)
         except Exception as e:
             log.exception("capture failed on %s", self.label)
@@ -281,7 +286,7 @@ class FileReplaySource:
             if delay > 0 and self._stopped.wait(delay):
                 return None
         self._emitted += block.size
-        self._level = dbfs(block)
+        self._level = peak_dbfs(block)
         return block
 
     def stop(self) -> None:

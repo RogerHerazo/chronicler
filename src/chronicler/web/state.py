@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from chronicler.audio.monitor import LevelMonitor
 from chronicler.campaign.store import Campaign, Store
 from chronicler.config import Settings, save_settings
 from chronicler.doctor import CheckResult
@@ -23,6 +24,7 @@ class AppState:
     pipeline: Pipeline = field(init=False)
     doctor_results: dict[str, CheckResult] = field(default_factory=dict)
     model_download: asyncio.Task[None] | None = None
+    monitor: LevelMonitor | None = None
 
     def __post_init__(self) -> None:
         self.store = Store(self.settings.db_path)

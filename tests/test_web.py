@@ -65,6 +65,7 @@ def test_doctor_check_rows(h: Harness) -> None:
 def test_settings_page_and_save(h: Harness) -> None:
     page = h.client.get("/settings").text
     assert "Speakers (default)" in page and "USB Mic (default)" in page
+    assert "Check levels" in page and "legend-red" in page
     r = h.client.post(
         "/settings",
         data={
@@ -150,3 +151,34 @@ def test_minutes() -> None:
     assert minutes(1) == "1 minute"
     assert minutes(15.0) == "15 minutes"
     assert minutes(7.5) == "7.5 minutes"
+
+
+def test_level_monitor(h: Harness, monkeypatch) -> None:
+    from tests.test_devices import ConstantCapture
+
+    monkeypatch.setattr(
+        devices,
+        "open_capture",
+        lambda kind, device_id, blocksize: ConstantCapture(0.3 if kind == "loopback" else 1.0),
+    )
+    r = h.client.post("/settings/monitor/start")
+    assert r.status_code == 200 and r.json()["running"]
+    import time
+
+    time.sleep(0.5)
+    data = h.client.get("/api/monitor").json()
+    assert data["running"]
+    assert round(data["levels"]["system"]) == -10  # 0.3 peak ≈ -10.5 dBFS
+    assert data["clipping"] == {"system": False, "mic": True}
+    assert h.client.post("/settings/monitor/stop").status_code == 204
+    assert h.client.get("/api/monitor").json() == {"running": False}
+
+
+def test_level_monitor_reports_device_errors(h: Harness, monkeypatch) -> None:
+    def broken(kind, device_id, blocksize):
+        raise devices.AudioUnavailableError("Could not open the microphone 'USB Mic'.")
+
+    monkeypatch.setattr(devices, "open_capture", broken)
+    r = h.client.post("/settings/monitor/start")
+    assert r.status_code == 409
+    assert "USB Mic" in r.json()["detail"]
