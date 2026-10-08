@@ -105,7 +105,11 @@ If Whisper and the model share one GPU, make sure both fit in its memory.
 ## Using it
 
 1. **Health**: fix anything red. Yellow items are optional.
-2. **Settings**: pick your devices and press **Test for 3 seconds** while something plays and you speak. Set the spoken language if you know it.
+2. **Settings**: pick your devices and press **Check levels**.
+   Talk as loudly as you do during a game while something plays.
+   The meters are green for normal levels, yellow for loud but fine, and red for too loud.
+   If your microphone hits red or shows CLIP, lower its input volume in your system sound settings while watching the meter.
+   Set the spoken language if you know it.
 3. **Live**: press **Start new session** when the game starts.
    The first recap appears after the first part is analyzed.
 4. **Campaign**: confirm, rename, merge or dismiss the names Chronicler suggests.
@@ -151,6 +155,7 @@ The most common ones are below.
 - **"CUDA libraries are missing"**: reinstall with the `[cuda]` extra, `uv tool install --reinstall "chronicler-dnd[cuda]"`, and update your NVIDIA driver.
 - **"No loopback (system audio) device found"**: on macOS, install BlackHole (see above). On Linux, install `libpulse0`.
 - **The system audio meter stays flat**: on Windows, Chronicler records your *default* output device. If Discord plays to a headset, pick that headset in Settings.
+- **My voice sounds distorted in the transcript or the recording**: your microphone input is too loud. Use **Check levels** in Settings and lower the input volume until loud speech stays out of the red. If Discord's "Automatic gain control" is on, it may keep raising it.
 - **Transcription is too slow for live play**: choose a smaller Whisper model in Settings, or analyze every 20 minutes.
 - **Names are misspelled**: confirm or rename them on the Campaign page, or add a notes folder with the correct spellings.
 
