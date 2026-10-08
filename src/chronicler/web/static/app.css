@@ -911,6 +911,10 @@ input[type="radio"] {
   transition: width 0.1s linear;
 }
 
+.meter-fill.is-clipping {
+  background: var(--fail);
+}
+
 .consent {
   font-size: 0.8rem;
   color: var(--muted);

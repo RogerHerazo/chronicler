@@ -2,13 +2,18 @@
 <div class="callout callout-fail">{{ error }}</div>
 {% else %}
 <ul class="audio-test">
-  {% for label, peak in peaks.items() %}
+  {% for label, r in peaks.items() %}
   <li>
     <span>{{ {'system': 'System audio', 'mic': 'Microphone'}.get(label, label) }}</span>
-    <span class="meter"><span class="meter-fill" style="width: {{ peak | meter_pct }}%"></span></span>
-    <span class="mono">{{ '%.0f' | format(peak) }} dB</span>
-    {% if peak < -55 %}<span class="text-warn">silent: play something or speak during the test</span>{% else %}<span class="text-ok">OK</span>{% endif %}
+    <span class="meter"><span class="meter-fill{% if r.clipped %} is-clipping{% endif %}" style="width: {{ r.peak_db | meter_pct }}%"></span></span>
+    <span class="mono">{{ '%.0f' | format(r.peak_db) }} dB</span>
+    {% if r.clipped %}<span class="text-fail">clipping: lower its input volume</span>
+    {% elif r.peak_db < -55 %}<span class="text-warn">silent: play something or speak during the test</span>
+    {% else %}<span class="text-ok">OK</span>{% endif %}
   </li>
   {% endfor %}
 </ul>
+{% if peaks.get('mic') and peaks['mic'].clipped %}
+<p class="hint">Your microphone is too loud and distorts. In Windows, open Sound settings → Input → your microphone and lower its volume until loud speech no longer clips (often 50 to 70%). If Discord's "Automatic gain control" is on, it may raise it again.</p>
+{% endif %}
 {% endif %}

@@ -11,6 +11,7 @@ import subprocess
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -303,6 +304,7 @@ def create_app(
                 "chunk_seconds": chunk_seconds,
                 "levels": rec.source.levels(),
                 "errors": rec.source.errors(),
+                "clipping": rec.source.clipping(),
             }
         )
 
@@ -560,18 +562,27 @@ def create_app(
     return app
 
 
+@dataclass
+class LevelTest:
+    peak_db: float = -90.0
+    clipped: bool = False
+
+
 def _measure_levels(
     loopback: str | None, mic: str | None, mic_enabled: bool, seconds: float = 3.0
-) -> dict[str, float]:
+) -> dict[str, LevelTest]:
     source = LiveSource(loopback, mic, mic_enabled)
     source.start()
-    peaks: dict[str, float] = {}
+    peaks: dict[str, LevelTest] = {}
     deadline = time.monotonic() + seconds
     try:
         while time.monotonic() < deadline:
             source.read()
+            clipping = source.clipping()
             for label, level in source.levels().items():
-                peaks[label] = max(peaks.get(label, -90.0), level)
+                result = peaks.setdefault(label, LevelTest())
+                result.peak_db = max(result.peak_db, level)
+                result.clipped = result.clipped or clipping.get(label, False)
         errors = source.errors()
         if errors:
             raise RuntimeError("; ".join(f"{k}: {v}" for k, v in errors.items()))

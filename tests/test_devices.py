@@ -100,3 +100,44 @@ def test_loopback_does_not_fall_back(monkeypatch) -> None:
     monkeypatch.setattr(devices, "_find_loopback", lambda device_id: FakeSoundcardMic())
     with pytest.raises(devices.AudioUnavailableError, match="Could not open"):
         devices.open_capture("loopback", None, blocksize=4800)
+
+
+class ConstantCapture:
+    backend = "fake"
+    samplerate = 48_000
+
+    def __init__(self, value: float):
+        self.value = value
+
+    def read(self, frames: int):
+        import time
+
+        import numpy as np
+
+        time.sleep(frames / self.samplerate)
+        return np.full((frames, 2), self.value, dtype=np.float32)
+
+    def close(self) -> None:
+        pass
+
+
+def test_live_mix_has_headroom_and_flags_clipping(monkeypatch) -> None:
+    import numpy as np
+
+    from chronicler.audio.source import LiveSource
+
+    values = {"loopback": 0.8, "mic": 1.0}
+    monkeypatch.setattr(
+        devices, "open_capture", lambda kind, device_id, blocksize: ConstantCapture(values[kind])
+    )
+    source = LiveSource(None, None, mic_enabled=True)
+    source.start()
+    blocks = [source.read() for _ in range(15)]
+    clipping = source.clipping()
+    source.stop()
+
+    mixed = np.concatenate(blocks)
+    steady = mixed[mixed.size // 2 :]
+    # (0.8 + 1.0) / 2 = 0.9: summed without clipping at 1.0.
+    assert np.allclose(np.median(steady), 0.9, atol=0.02)
+    assert clipping == {"system": False, "mic": True}

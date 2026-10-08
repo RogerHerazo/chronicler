@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 SAMPLE_RATE = 16_000
 BLOCK_SECONDS = 0.1
 SILENCE_DBFS = -90.0
+CLIP_LEVEL = 0.99
+# How long a clipped sample keeps a device flagged as clipping.
+CLIP_HOLD_SECONDS = 2.0
 
 
 def dbfs(block: np.ndarray) -> float:
@@ -46,6 +49,8 @@ class AudioSource(Protocol):
 
     def errors(self) -> dict[str, str]: ...
 
+    def clipping(self) -> dict[str, bool]: ...
+
 
 class _DeviceStream:
     """Captures one device on a background thread into a 16 kHz mono buffer."""
@@ -60,6 +65,7 @@ class _DeviceStream:
         self.level = SILENCE_DBFS
         self.error: str | None = None
         self.backend: str | None = None
+        self.last_clip = 0.0  # monotonic time of the last clipped raw sample
         self._opened = threading.Event()
         self._buf: deque[np.ndarray] = deque()
         self._buffered = 0
@@ -97,6 +103,8 @@ class _DeviceStream:
         try:
             while not self._stop.is_set():
                 data = capture.read(frames)
+                if data.size and float(np.abs(data).max()) >= CLIP_LEVEL:
+                    self.last_clip = time.monotonic()
                 mono = data.mean(axis=1) if data.ndim == 2 else data
                 out = resampler.resample_chunk(np.ascontiguousarray(mono, dtype=np.float32))
                 self.level = dbfs(out)
@@ -120,6 +128,10 @@ class _DeviceStream:
             while self._buffered > limit and self._buf:
                 dropped = self._buf.popleft()
                 self._buffered -= dropped.size
+
+    @property
+    def clipping(self) -> bool:
+        return time.monotonic() - self.last_clip < CLIP_HOLD_SECONDS
 
     def take(self, n: int) -> np.ndarray:
         """Return exactly n samples, zero-padded if the device delivered fewer."""
@@ -182,8 +194,11 @@ class LiveSource:
         if due <= 0:
             return np.zeros(0, dtype=np.float32)
         mixed = np.zeros(due, dtype=np.float32)
+        # Give each source headroom so loud system audio plus a loud mic don't
+        # clip when summed. Whisper normalizes levels, so quieter is harmless.
+        gain = 1.0 / len(self._streams)
         for s in self._streams:
-            mixed += s.take(due)
+            mixed += s.take(due) * gain
         np.clip(mixed, -1.0, 1.0, out=mixed)
         self._emitted += due
         return mixed
@@ -198,6 +213,9 @@ class LiveSource:
 
     def errors(self) -> dict[str, str]:
         return {s.label: s.error for s in self._streams if s.error}
+
+    def clipping(self) -> dict[str, bool]:
+        return {s.label: s.clipping for s in self._streams}
 
     def backends(self) -> dict[str, str | None]:
         return {s.label: s.backend for s in self._streams}
@@ -273,4 +291,7 @@ class FileReplaySource:
         return {"file": self._level}
 
     def errors(self) -> dict[str, str]:
+        return {}
+
+    def clipping(self) -> dict[str, bool]:
         return {}

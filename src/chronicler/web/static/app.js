@@ -40,11 +40,18 @@
 
     const banner = document.querySelector("[data-capture-error]");
     if (banner) {
-      const failed = Object.entries(data.errors);
-      banner.hidden = failed.length === 0;
-      banner.textContent = failed
-        .map(([label, error]) => `${LABELS[label] || label} stopped recording: ${error}`)
-        .join(" · ");
+      const messages = Object.entries(data.errors).map(
+        ([label, error]) => `${LABELS[label] || label} stopped recording: ${error}`
+      );
+      for (const [label, clipping] of Object.entries(data.clipping || {})) {
+        if (clipping && !data.errors[label]) {
+          messages.push(
+            `${LABELS[label] || label} is clipping (distorted). Lower its input volume in your system sound settings.`
+          );
+        }
+      }
+      banner.hidden = messages.length === 0;
+      banner.textContent = messages.join(" · ");
     }
 
     const meters = strip.querySelector("[data-meters]");
@@ -60,7 +67,9 @@
       }
       const error = data.errors[label];
       row.title = error ? `Capture error: ${error}` : `${Math.round(db)} dB`;
-      row.querySelector(".meter-fill").style.width = (error ? 0 : meterPct(db)) + "%";
+      const fill = row.querySelector(".meter-fill");
+      fill.style.width = (error ? 0 : meterPct(db)) + "%";
+      fill.classList.toggle("is-clipping", Boolean(data.clipping && data.clipping[label]));
     }
   }
 

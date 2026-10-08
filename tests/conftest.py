@@ -47,6 +47,9 @@ class ArraySource:
     def errors(self) -> dict[str, str]:
         return {}
 
+    def clipping(self) -> dict[str, bool]:
+        return {}
+
 
 def speechy(seconds: float, quiet_at: list[float] | None = None) -> np.ndarray:
     """Loud noise with 1-second silent gaps at the given times."""
