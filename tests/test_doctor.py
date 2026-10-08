@@ -31,8 +31,32 @@ def test_audio_without_loopback(settings: Settings, monkeypatch) -> None:
     assert "loopback" in result.detail.lower()
 
 
+class FakeCapture:
+    def __init__(self, backend: str = "soundcard"):
+        self.backend = backend
+        self.samplerate = 48_000
+
+    def read(self, frames: int):
+        import time
+
+        import numpy as np
+
+        time.sleep(0.01)
+        return np.zeros((frames, 1), dtype=np.float32)
+
+    def close(self) -> None:
+        pass
+
+
 def test_audio_ok_with_both_devices(settings: Settings, monkeypatch) -> None:
     monkeypatch.setattr(devices, "is_wsl", lambda: False)
+    monkeypatch.setattr(
+        devices,
+        "open_capture",
+        lambda kind, device_id, blocksize: FakeCapture(
+            "portaudio" if kind == "mic" else "soundcard"
+        ),
+    )
     monkeypatch.setattr(
         devices,
         "list_devices",
@@ -44,6 +68,29 @@ def test_audio_ok_with_both_devices(settings: Settings, monkeypatch) -> None:
     result = doctor.run_check(by_id(settings)["audio"])
     assert result.status == "ok"
     assert "Speakers" in result.detail and "USB Mic" in result.detail
+    assert "PortAudio fallback" in result.detail
+
+
+def test_audio_fails_when_a_device_cannot_be_opened(settings: Settings, monkeypatch) -> None:
+    monkeypatch.setattr(devices, "is_wsl", lambda: False)
+    monkeypatch.setattr(
+        devices,
+        "list_devices",
+        lambda: [
+            DeviceInfo("s1", "Speakers", "loopback", True),
+            DeviceInfo("m1", "USB Mic", "mic", True),
+        ],
+    )
+
+    def open_capture(kind, device_id, blocksize):
+        if kind == "mic":
+            raise devices.AudioUnavailableError("Could not open the microphone 'USB Mic'.")
+        return FakeCapture()
+
+    monkeypatch.setattr(devices, "open_capture", open_capture)
+    result = doctor.run_check(by_id(settings)["audio"])
+    assert result.status == "fail" and result.blocking
+    assert "Could not open the microphone" in result.detail
 
 
 def test_storage_and_notes(settings: Settings, tmp_path) -> None:

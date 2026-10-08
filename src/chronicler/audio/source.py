@@ -12,7 +12,7 @@ import threading
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import numpy as np
 import soxr
@@ -50,14 +50,17 @@ class AudioSource(Protocol):
 class _DeviceStream:
     """Captures one device on a background thread into a 16 kHz mono buffer."""
 
-    CAPTURE_RATE = 48_000
     MAX_BACKLOG_SECONDS = 1.0
+    OPEN_TIMEOUT_SECONDS = 5.0
 
-    def __init__(self, label: str, device: Any):
+    def __init__(self, label: str, kind: Literal["loopback", "mic"], device_id: str | None):
         self.label = label
-        self.device = device
+        self.kind: Literal["loopback", "mic"] = kind
+        self.device_id = device_id
         self.level = SILENCE_DBFS
         self.error: str | None = None
+        self.backend: str | None = None
+        self._opened = threading.Event()
         self._buf: deque[np.ndarray] = deque()
         self._buffered = 0
         self._lock = threading.Lock()
@@ -65,7 +68,12 @@ class _DeviceStream:
         self._thread = threading.Thread(target=self._run, name=f"capture-{label}", daemon=True)
 
     def start(self) -> None:
+        """Start capturing. Raises if the device cannot be opened."""
         self._thread.start()
+        if not self._opened.wait(self.OPEN_TIMEOUT_SECONDS):
+            raise devices.AudioUnavailableError(f"Timed out opening the {self.label} device.")
+        if self.error:
+            raise devices.AudioUnavailableError(self.error)
 
     def stop(self) -> None:
         self._stop.set()
@@ -74,19 +82,33 @@ class _DeviceStream:
         self._thread.join(timeout=2.0)
 
     def _run(self) -> None:
-        resampler = soxr.ResampleStream(self.CAPTURE_RATE, SAMPLE_RATE, 1, dtype="float32")
-        frames = int(self.CAPTURE_RATE * BLOCK_SECONDS)
+        # Open on this thread: WASAPI objects belong to the thread that made them.
         try:
-            with self.device.recorder(samplerate=self.CAPTURE_RATE, blocksize=frames) as rec:
-                while not self._stop.is_set():
-                    data = rec.record(numframes=frames)
-                    mono = data.mean(axis=1) if data.ndim == 2 else data
-                    out = resampler.resample_chunk(np.ascontiguousarray(mono, dtype=np.float32))
-                    self.level = dbfs(out)
-                    self._push(out)
+            capture = devices.open_capture(self.kind, self.device_id, blocksize=4800)
+        except Exception as e:
+            log.warning("could not open %s: %s", self.label, e)
+            self.error = str(e) or type(e).__name__
+            self._opened.set()
+            return
+        self.backend = capture.backend
+        self._opened.set()
+        resampler = soxr.ResampleStream(capture.samplerate, SAMPLE_RATE, 1, dtype="float32")
+        frames = int(capture.samplerate * BLOCK_SECONDS)
+        try:
+            while not self._stop.is_set():
+                data = capture.read(frames)
+                mono = data.mean(axis=1) if data.ndim == 2 else data
+                out = resampler.resample_chunk(np.ascontiguousarray(mono, dtype=np.float32))
+                self.level = dbfs(out)
+                self._push(out)
         except Exception as e:
             log.exception("capture failed on %s", self.label)
             self.error = str(e) or type(e).__name__
+        finally:
+            try:
+                capture.close()
+            except Exception:
+                log.debug("error closing %s", self.label, exc_info=True)
 
     def _push(self, samples: np.ndarray) -> None:
         with self._lock:
@@ -128,18 +150,24 @@ class LiveSource:
     """
 
     def __init__(self, loopback_id: str | None, mic_id: str | None, mic_enabled: bool = True):
-        self._streams: list[_DeviceStream] = [
-            _DeviceStream("system", devices.open_loopback(loopback_id))
-        ]
+        self._streams: list[_DeviceStream] = [_DeviceStream("system", "loopback", loopback_id)]
         if mic_enabled:
-            self._streams.append(_DeviceStream("mic", devices.open_mic(mic_id)))
+            self._streams.append(_DeviceStream("mic", "mic", mic_id))
         self._t0 = 0.0
         self._emitted = 0
         self._stopped = threading.Event()
 
     def start(self) -> None:
-        for s in self._streams:
-            s.start()
+        """Open every device. If one fails, close the others and raise."""
+        started: list[_DeviceStream] = []
+        try:
+            for s in self._streams:
+                s.start()
+                started.append(s)
+        except Exception:
+            for s in started:
+                s.stop()
+            raise
         self._t0 = time.monotonic()
         self._emitted = 0
 
@@ -170,6 +198,9 @@ class LiveSource:
 
     def errors(self) -> dict[str, str]:
         return {s.label: s.error for s in self._streams if s.error}
+
+    def backends(self) -> dict[str, str | None]:
+        return {s.label: s.backend for s in self._streams}
 
 
 class FileReplaySource:

@@ -35,6 +35,7 @@ def test_recorder_emits_contiguous_chunks(tmp_path) -> None:
     audio = speechy(100, quiet_at=[29.0, 61.0])
     chunks: list[AudioChunk] = []
     rec = Recorder(ArraySource(audio), tmp_path, chunk_seconds=30, on_chunk=chunks.append)
+    rec.source.start()
     rec.start()
     rec.finished.wait(10)
 
@@ -63,6 +64,7 @@ def test_recorder_continues_numbering_and_offsets(tmp_path) -> None:
         first_index=4,
         start_offset=600.0,
     )
+    rec.source.start()
     rec.start()
     rec.finished.wait(10)
     assert [c.index for c in chunks] == [4]
@@ -74,6 +76,7 @@ def test_recorder_continues_numbering_and_offsets(tmp_path) -> None:
 def test_recorder_drops_tiny_tail(tmp_path) -> None:
     chunks: list[AudioChunk] = []
     rec = Recorder(ArraySource(speechy(1.0)), tmp_path, chunk_seconds=60, on_chunk=chunks.append)
+    rec.source.start()
     rec.start()
     rec.finished.wait(10)
     assert chunks == []

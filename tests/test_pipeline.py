@@ -141,3 +141,25 @@ async def test_continue_session_and_resume_after_restart(settings: Settings) -> 
     assert store2.get_session(session.id).status == "stopped"
     assert store2.get_chunk(chunks[-1].id).status == "done"
     await pipeline2.shutdown()
+
+
+class BrokenSource(ArraySource):
+    def start(self) -> None:
+        from chronicler.audio.devices import AudioUnavailableError
+
+        raise AudioUnavailableError("Could not open the microphone 'USB Mic'.")
+
+
+async def test_device_failure_creates_no_session(settings: Settings) -> None:
+    import pytest
+
+    from chronicler.audio.devices import AudioUnavailableError
+
+    store, pipeline = make_pipeline(settings, FakeProvider(), FakeTranscriber())
+    await pipeline.start()
+    campaign = store.create_campaign("C")
+    with pytest.raises(AudioUnavailableError):
+        await pipeline.start_recording(campaign.id, BrokenSource(speechy(5)), 20)
+    assert store.list_sessions(campaign.id) == []
+    assert pipeline.recording is None
+    await pipeline.shutdown()

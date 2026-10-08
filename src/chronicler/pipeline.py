@@ -142,10 +142,14 @@ class Pipeline:
     ) -> Session:
         if self.recording:
             raise RuntimeError("A session is already recording.")
+        if continue_session_id is not None and self.store.get_session(continue_session_id) is None:
+            raise ValueError("Unknown session.")
+        # Open the audio devices before touching the database, so a device that
+        # cannot be opened leaves no half-started session behind.
+        await asyncio.to_thread(source.start)
         if continue_session_id is not None:
             session = self.store.get_session(continue_session_id)
-            if session is None:
-                raise ValueError("Unknown session.")
+            assert session is not None
             chunks = self.store.list_chunks(session.id)
             first_index = chunks[-1].idx + 1 if chunks else 0
             offset = chunks[-1].end_s if chunks else 0.0
@@ -167,7 +171,7 @@ class Pipeline:
             first_index=first_index,
             start_offset=offset,
         )
-        await asyncio.to_thread(recorder.start)
+        recorder.start()
         self.recording = ActiveRecording(session.id, campaign_id, recorder, source)
         self.bus.publish("session", session_id=session.id, status="recording")
         self._watcher = asyncio.create_task(self._watch_recorder(recorder, session.id))

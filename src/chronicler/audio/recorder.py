@@ -91,8 +91,9 @@ class Recorder:
         return self._buffered / SAMPLE_RATE
 
     def start(self) -> None:
+        """Start consuming. The caller starts the source first, so device errors
+        surface before anything is written."""
         (self.session_dir / "chunks").mkdir(parents=True, exist_ok=True)
-        self.source.start()
         self._thread.start()
 
     def stop(self) -> None:

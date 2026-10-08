@@ -38,6 +38,15 @@
     strip.querySelector("[data-chunk-progress]").style.width =
       Math.min(100, (data.buffered / data.chunk_seconds) * 100) + "%";
 
+    const banner = document.querySelector("[data-capture-error]");
+    if (banner) {
+      const failed = Object.entries(data.errors);
+      banner.hidden = failed.length === 0;
+      banner.textContent = failed
+        .map(([label, error]) => `${LABELS[label] || label} stopped recording: ${error}`)
+        .join(" · ");
+    }
+
     const meters = strip.querySelector("[data-meters]");
     for (const [label, db] of Object.entries(data.levels)) {
       let row = meters.querySelector(`[data-meter="${label}"]`);

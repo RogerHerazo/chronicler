@@ -267,12 +267,15 @@ def create_app(
             )
         except Exception as e:
             raise HTTPException(500, f"Could not open the audio devices: {e}") from e
-        await state.pipeline.start_recording(
-            campaign.id,
-            source,
-            s.chunk_minutes * 60,
-            continue_session_id=continue_session_id,
-        )
+        try:
+            await state.pipeline.start_recording(
+                campaign.id,
+                source,
+                s.chunk_minutes * 60,
+                continue_session_id=continue_session_id,
+            )
+        except devices.AudioUnavailableError as e:
+            raise HTTPException(409, f"{e} Check the devices in Settings.") from e
         return redirect("/live")
 
     @app.post("/live/stop")

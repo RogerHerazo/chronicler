@@ -36,6 +36,7 @@ dependencies = [
   "python-multipart>=0.0.9",
   "rich>=13",
   "soundcard>=0.4.3",
+  "sounddevice>=0.5",
   "soundfile>=0.12",
   "soxr>=0.4",
   "sse-starlette>=2.1",

@@ -141,6 +141,23 @@ def _audio(settings: Settings) -> Callable[[], tuple[Status, str, str]]:
             detail += f". Microphone: {mic.name}"
         else:
             detail += ". Microphone: off"
+        # Listing is not enough: some devices only fail when opened.
+        from chronicler.audio.source import LiveSource
+
+        source = LiveSource(settings.loopback_device, settings.mic_device, settings.mic_enabled)
+        try:
+            source.start()
+        except devices.AudioUnavailableError as e:
+            return (
+                "fail",
+                f"{detail}. {e}",
+                "Pick another device in Settings, or check that Windows allows desktop apps "
+                "to use the microphone (Settings → Privacy & security → Microphone).",
+            )
+        backends = source.backends()
+        source.stop()
+        if backends.get("mic") == "portaudio":
+            detail += " (opened through the PortAudio fallback)"
         return "ok", detail, ""
 
     return run
