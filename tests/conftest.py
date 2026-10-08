@@ -91,8 +91,11 @@ class FakeProvider:
             beats=[f"Beat {n}"],
             recap=f"Recap after part {ctx.chunk_index + 1}.",
             entities=[
-                EntityMention(name="Strahd", kind="npc", known=n > 1, note=f"Strahd note {n}"),
-                EntityMention(name="Barovia", kind="place", known=False, note="A gloomy village."),
+                EntityMention(name="Strahd", kind="npc", in_notes=False, note=f"Strahd note {n}"),
+                EntityMention(
+                    name="Barovia", kind="place", in_notes=False, note="A gloomy village."
+                ),
+                EntityMention(name="Ireena", kind="npc", in_notes=True, note="From the notes."),
             ],
             threads=[
                 ThreadUpdate(

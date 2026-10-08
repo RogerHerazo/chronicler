@@ -89,6 +89,23 @@ MIGRATIONS: list[str] = [
     CREATE INDEX idx_mentions_session ON mentions(session_id);
     CREATE INDEX idx_thread_events_session ON thread_events(session_id);
     """,
+    # 2: entities that came from the campaign notes were tracked as new in the
+    # session where they were first mentioned. The analysis of an entity's
+    # first mention (before it existed in the tracker) flagged it `known` only
+    # if it was in the notes, so use that flag to reclassify them as canon.
+    """
+    UPDATE entities SET first_session_id = NULL, status = 'confirmed'
+    WHERE status = 'suggested' AND id IN (
+        SELECT m.entity_id
+        FROM mentions m
+        JOIN chunks c ON c.id = m.chunk_id
+        JOIN json_each(json_extract(c.analysis_json, '$.entities')) j
+        JOIN entities e ON e.id = m.entity_id
+        WHERE m.id = (SELECT MIN(m2.id) FROM mentions m2 WHERE m2.entity_id = m.entity_id)
+          AND json_extract(j.value, '$.known') = 1
+          AND lower(json_extract(j.value, '$.name')) = lower(e.name)
+    );
+    """,
 ]
 
 

@@ -15,8 +15,11 @@ KnownEntity = tuple[str, str, list[str]]
 class EntityMention(BaseModel):
     name: str = Field(description="Canonical spelling. Reuse the known name exactly if it matches.")
     kind: EntityKind
-    known: bool = Field(
-        description="True if this matches a known entity or something in the campaign notes."
+    in_notes: bool = Field(
+        description=(
+            "True only if this entity appears in the campaign notes provided by the game "
+            "master. False if it is new, or only came up earlier in this session."
+        )
     )
     note: str = Field(description="One sentence: what this entity did or what was learned.")
 

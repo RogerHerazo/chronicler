@@ -55,11 +55,14 @@ async def test_full_session_flow(settings: Settings) -> None:
     assert ("Strahd", "npc", []) in provider.contexts[1].known_entities
     assert provider.contexts[1].open_threads == ["Who sent the letter?"]
 
-    # Entities are deduplicated across chunks and flagged as new this session.
-    entities = store.session_entities(session.id)
-    assert sorted(e.name for e, _, _ in entities) == ["Barovia", "Strahd"]
-    assert all(is_new for _, _, is_new in entities)
-    assert all(e.status == "suggested" for e, _, _ in entities)
+    # Entities are deduplicated across chunks. New ones await confirmation;
+    # ones from the campaign notes are canon and listed as known.
+    entities = {e.name: (e.status, is_new) for e, _, is_new in store.session_entities(session.id)}
+    assert entities == {
+        "Strahd": ("suggested", True),
+        "Barovia": ("suggested", True),
+        "Ireena": ("confirmed", False),
+    }
     [(_thread, thread_events)] = store.session_threads(session.id)
     assert [k for k, _ in thread_events] == ["opened", "advanced", "advanced"]
 

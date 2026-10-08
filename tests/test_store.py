@@ -1,7 +1,7 @@
 # pyright: reportOptionalMemberAccess=false, reportArgumentType=false
 from __future__ import annotations
 
-from chronicler.campaign.store import Store
+from chronicler.campaign.store import MIGRATIONS, Store
 
 
 def make(tmp_path):
@@ -14,7 +14,7 @@ def make(tmp_path):
 def test_migrations_are_idempotent(tmp_path) -> None:
     Store(tmp_path / "db.sqlite").close()
     store = Store(tmp_path / "db.sqlite")
-    assert store._conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert store._conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
 
 
 def test_find_entity_matches_aliases_case_insensitively(tmp_path) -> None:
@@ -79,3 +79,53 @@ def test_session_dir_is_created(tmp_path) -> None:
     _, _, session = make(tmp_path)
     assert session.path.is_dir()
     assert session.path.name.endswith(f"_session-{session.id}")
+
+
+def test_migration_2_reclassifies_entities_from_notes(tmp_path) -> None:
+    """Version-1 databases tracked notes entities as new; the first mention's
+    `known` flag tells which ones came from the notes."""
+    import json
+    import sqlite3
+
+    path = tmp_path / "v1.sqlite"
+    conn = sqlite3.connect(path)
+    conn.executescript(f"BEGIN; {MIGRATIONS[0]}; PRAGMA user_version = 1; COMMIT;")
+    conn.executescript(
+        """
+        INSERT INTO campaigns VALUES (1, 'Valkara', NULL, 'x');
+        INSERT INTO sessions VALUES (1, 1, NULL, 'x', NULL, 'stopped', '/tmp', '', NULL);
+        INSERT INTO entities VALUES (1, 1, 'Solene Brey', 'npc', '[]', '', 'suggested', 1, 'x');
+        INSERT INTO entities VALUES (2, 1, 'Golden thread knot', 'other', '[]', '',
+                                     'suggested', 1, 'x');
+        INSERT INTO entities VALUES (3, 1, 'Mickey', 'npc', '[]', '', 'dismissed', 1, 'x');
+        """
+    )
+    first = {
+        "entities": [
+            {"name": "solene brey", "kind": "npc", "known": True, "note": ""},
+            {"name": "Golden thread knot", "kind": "other", "known": False, "note": ""},
+            {"name": "Mickey", "kind": "npc", "known": True, "note": ""},
+        ]
+    }
+    # Later chunks call the knot "known" only because it was already tracked.
+    later = {
+        "entities": [{"name": "Golden thread knot", "kind": "other", "known": True, "note": ""}]
+    }
+    for chunk_id, analysis in ((1, first), (2, later)):
+        conn.execute(
+            "INSERT INTO chunks (id, session_id, idx, start_s, end_s, audio_path, status, "
+            "analysis_json) VALUES (?, 1, ?, 0, 1, 'a.wav', 'done', ?)",
+            (chunk_id, chunk_id - 1, json.dumps(analysis)),
+        )
+    conn.executemany(
+        "INSERT INTO mentions (entity_id, session_id, chunk_id, note) VALUES (?, 1, ?, '')",
+        [(1, 1), (2, 1), (3, 1), (2, 2)],
+    )
+    conn.commit()
+    conn.close()
+
+    store = Store(path)
+    solene, knot, mickey = (store.get_entity(i) for i in (1, 2, 3))
+    assert (solene.status, solene.first_session_id) == ("confirmed", None)
+    assert (knot.status, knot.first_session_id) == ("suggested", 1)
+    assert mickey.status == "dismissed"  # the user's decision is kept

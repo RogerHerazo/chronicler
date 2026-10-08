@@ -325,12 +325,15 @@ class Pipeline:
         for mention in analysis.entities:
             entity = store.find_entity(session.campaign_id, mention.name)
             if entity is None:
+                # Something from the GM's notes is canon that predates this
+                # session: it is known and needs no confirmation.
                 entity = store.add_entity(
                     session.campaign_id,
                     mention.name,
                     mention.kind,
                     notes=mention.note,
-                    first_session_id=session.id,
+                    status="confirmed" if mention.in_notes else "suggested",
+                    first_session_id=None if mention.in_notes else session.id,
                 )
             store.add_mention(entity.id, session.id, chunk.id, mention.note)
 

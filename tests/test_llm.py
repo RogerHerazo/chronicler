@@ -13,7 +13,7 @@ from chronicler.llm.ollama import OllamaProvider
 VALID = {
     "beats": ["The party arrived."],
     "recap": "They arrived.",
-    "entities": [{"name": "Strahd", "kind": "npc", "known": True, "note": "Watched."}],
+    "entities": [{"name": "Strahd", "kind": "npc", "in_notes": True, "note": "Watched."}],
     "threads": [{"title": "The letter", "change": "opened", "note": "Unsigned."}],
 }
 
